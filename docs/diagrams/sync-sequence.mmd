@@ -1,0 +1,15 @@
+sequenceDiagram
+  participant H as Host
+  participant S as Server (room pinned)
+  participant R as Redis
+  participant V as Viewer
+  H->>S: playback:play {position: 12}
+  S->>S: assertCan(host, play), Room.applyAction
+  S-->>H: playback:state {playing, position 12, updatedAt T, v+1}
+  S-->>V: playback:state {...}
+  S->>R: SET room:CODE:state
+  V->>V: target = 12 + (serverNow - T); seek/play
+  loop every 1 s
+    V->>V: drift = player.time - target; nudge rate or seek
+  end
+  Note over V,S: participant pause -> approval:request -> host approval:approve -> playback:state

@@ -1,0 +1,12 @@
+flowchart LR
+  B[Browser<br/>React + Socket.IO client] -->|HTTPS / WSS| N[nginx<br/>hash on ?room=]
+  N --> S1[server1<br/>Express + Socket.IO]
+  N --> S2[server2<br/>Express + Socket.IO]
+  S1 <-->|adapter pub/sub, snapshots, chat| R[(Redis)]
+  S2 <-->|adapter pub/sub, snapshots, chat| R
+  S1 --> P[(PostgreSQL<br/>users, rooms, media)]
+  S2 --> P
+  B -->|presigned PUT / signed GET| M[(MinIO / S3)]
+  S1 -.->|presign, FFmpeg worker| M
+  S1 -->|/metrics| PR[Prometheus] --> G[Grafana]
+  S2 -->|/metrics| PR

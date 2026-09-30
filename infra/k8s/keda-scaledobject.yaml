@@ -1,0 +1,15 @@
+# Scale realtime pods on connected sockets (not CPU). Requires KEDA + a Prometheus server.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: realtime-sockets }
+spec:
+  scaleTargetRef: { name: realtime }
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  cooldownPeriod: 300
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring:9090
+        query: sum(wp_connected_sockets)
+        threshold: "2000"      # target ~2000 sockets per pod

@@ -1,0 +1,64 @@
+# Minimal k3s / Kubernetes manifests. Apply with:  kubectl apply -f infra/k8s/
+# Assumes Postgres, Redis and S3-compatible storage exist and are referenced by the Secret.
+apiVersion: v1
+kind: Secret
+metadata: { name: watch-party-env }
+type: Opaque
+stringData:
+  JWT_SECRET: "replace-with-openssl-rand-hex-32"
+  DATABASE_URL: "postgres://user:pass@postgres:5432/watchparty"
+  REDIS_URL: "redis://redis:6379"
+  S3_ENDPOINT: "http://minio:9000"
+  S3_PUBLIC_ENDPOINT: "https://media.example.com"
+  S3_ACCESS_KEY: "minioadmin"
+  S3_SECRET_KEY: "minioadmin"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: realtime }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: realtime } }
+  template:
+    metadata:
+      labels: { app: realtime }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "4000", prometheus.io/path: /metrics }
+    spec:
+      terminationGracePeriodSeconds: 30   # SIGTERM -> server drains sockets for 5s, clients reconnect elsewhere
+      containers:
+        - name: server
+          image: ghcr.io/YOUR_ORG/watch-party-server:latest
+          ports: [{ containerPort: 4000 }]
+          envFrom: [{ secretRef: { name: watch-party-env } }]
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: NODE_ID, valueFrom: { fieldRef: { fieldPath: metadata.name } } }
+            - { name: CLIENT_ORIGIN, value: "https://watch.example.com" }
+          readinessProbe: { httpGet: { path: /health, port: 4000 }, periodSeconds: 3 }
+          livenessProbe: { httpGet: { path: /health, port: 4000 }, initialDelaySeconds: 10, periodSeconds: 10 }
+          resources: { requests: { cpu: 200m, memory: 256Mi }, limits: { memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: realtime }
+spec:
+  selector: { app: realtime }
+  ports: [{ port: 4000, targetPort: 4000 }]
+---
+# Ingress: keep a room on one pod by hashing the ?room= arg (ingress-nginx annotation)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: watch-party
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$arg_room"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: watch.example.com
+      http:
+        paths:
+          - { path: /socket.io, pathType: Prefix, backend: { service: { name: realtime, port: { number: 4000 } } } }
+          - { path: /api, pathType: Prefix, backend: { service: { name: realtime, port: { number: 4000 } } } }

@@ -1,0 +1,12 @@
+flowchart TB
+  U[Users] --> CDN[CDN + WAF]
+  CDN --> GW[API gateway]
+  GW --> LB[L7 LB - WebSocket]
+  LB --> RT1[Realtime pod] & RT2[Realtime pod] & RTN[Realtime pod ... KEDA on sockets]
+  RT1 & RT2 & RTN --> RC[(Redis Cluster - regional)]
+  RT1 & RT2 & RTN --> K{{Kafka / Redis Streams}}
+  K --> MED[Media workers - queue depth] & ANA[Analytics] & MOD[Moderation]
+  RT1 & RT2 & RTN --> PG[(Managed Postgres)]
+  RT1 & RT2 & RTN --> CH[(Cassandra / Scylla - chat)]
+  MED --> S3[(S3 / R2 - HLS segments)]
+  CDN --> S3

@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: watch-party-server
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['server1:4000', 'server2:4000']
