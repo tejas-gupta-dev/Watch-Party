@@ -101,9 +101,9 @@ sequenceDiagram
   S-->>H: playback:state {playing, position 12, updatedAt T, v+1}
   S-->>V: playback:state {...}
   S->>R: SET room snapshot
-  V->>V: target = 12 + (serverNow - T); seek/play
+  V->>V: target = 12 + (serverNow - T), then seek/play
   loop every 1 s
-    V->>V: drift = player.time - target; nudge rate or seek
+    V->>V: drift = player.time - target, then nudge rate or seek
   end
 ```
 
